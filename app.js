@@ -4,6 +4,7 @@ require('dotenv').config();
 const twilioClient = require("twilio")(
   process.env.TWILIO_ACCOUNT_SID,
   process.env.TWILIO_AUTH_TOKEN
+
 );
 
 const app = express();
@@ -28,7 +29,7 @@ class AirtelProvider extends SMSProvider {
       //   const response = await twilioClient.messages.create({
       //     body: text,
       //     to: phoneNumber,
-      //     from: "+165023965825",
+      //     from: process.env.TWILIO_PHONE_NUMBER,
       //   });
       console.log("sending msg via Airtel VIProvider");
 
@@ -48,7 +49,7 @@ class JIOProvider extends SMSProvider {
       //   const response = await twilioClient.messages.create({
       //     body: text,
       //     to: phoneNumber,
-      //     from: "+165023965825",
+      //     from: process.env.TWILIO_PHONE_NUMBER,
       //   });
       console.log("sending msg via JIO Provider");
 
@@ -68,7 +69,7 @@ class VIProvider extends SMSProvider {
       //   const response = await twilioClient.messages.create({
       //     body: text,
       //     to: phoneNumber,
-      //     from: "+165023965825",
+      //     from: process.env.TWILIO_PHONE_NUMBER,
       //   });
       console.log("sending msg via VIProvider");
       this.count++;
