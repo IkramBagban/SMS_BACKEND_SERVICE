@@ -1,5 +1,4 @@
 const express = require("express");
-const LoadBalancer = require("./models/loadbalancer");
 const { readQueue, writeQueue } = require("./utils/queue");
 const { TokenBucket } = require("./utils/rate-limiter");
 
@@ -37,24 +36,34 @@ class SMSProvider {
         reject(`Failed to send message ${message.id}`); // Reject with error message
       }
     });
-  }
 
-  async sendMessages() {
-    try {
-      const queue = await readQueue();
-      while (queue.length > 0) {
-        const message = queue.shift(); // Get the first message from the queue
-        try {
-          const data = await sendMessage(message); // Send the message asynchronously
-          console.log(data);
-        } catch (error) {
-          console.error(error);
-          writeQueue(message);
+    async function sendMessages() {
+      try {
+        while (true) {
+          const queue = await readQueue(); // Fetch the queue data dynamically
+          if (queue.length === 0) {
+            console.log("Queue is empty. Exiting.");
+            break;
+          }
+          const message = queue.shift(); // Get the first message from the queue
+          try {
+            const data = await this.sendMessage(message); // Send the message asynchronously
+            console.log(data);
+          } catch (error) {
+            console.error(error);
+            // If sending the message fails, write it back to the queue
+            await writeQueue(message);
+          }
         }
+      } catch (err) {
+        console.error(err);
       }
-      console.log("Queue is empty. Exiting.");
-    } catch (err) {
-      console.error(err);
     }
   }
 }
+
+const PORT = process.env.PORT || 3032;
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
