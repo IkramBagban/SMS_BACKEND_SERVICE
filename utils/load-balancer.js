@@ -1,55 +1,60 @@
-export function distributeMessages(providers, totalMessages) {
-  let totalThroughput = providers.reduce(
-    (sum, provider) =>
-      sum + (provider.status === "up" ? provider.throughput : 0),
-    0
-  );
-
-  if (totalThroughput === 0) {
-    console.log("No active providers available.");
-    return;
+class WeightedRoundRobinBalancer {
+  constructor(servers) {
+    this.servers = [...servers];
+    this.totalWeight = this.calculateTotalWeight(servers);
+    this.cumulativeWeights = this.calculateCumulativeWeights(servers);
+    this.currentIndex = 0;
+    this.random = new Random();
   }
 
-  let distributedMessages = [];
-
-  providers.forEach((provider) => {
-    let targetMessages =
-      provider.status === "up"
-        ? Math.floor((provider.throughput / totalThroughput) * totalMessages)
-        : 0;
-    distributedMessages.push({
-      provider: provider.name,
-      messages: targetMessages,
-    });
-  });
-
-  // Adjust for rounding errors or remainders
-  let remainingMessages =
-    totalMessages -
-    distributedMessages.reduce((sum, message) => sum + message.messages, 0);
-  while (remainingMessages > 0) {
-    let maxIndex = distributedMessages.reduce(
-      (maxIndex, message, currentIndex) =>
-        message.messages > distributedMessages[maxIndex].messages
-          ? currentIndex
-          : maxIndex,
-      0
-    );
-    distributedMessages[maxIndex].messages++;
-    remainingMessages--;
+  calculateTotalWeight(servers) {
+    let totalWeight = 0;
+    for (let server of servers) {
+      totalWeight += server.weight;
+    }
+    return totalWeight;
   }
 
-  // Send messages to each provider
-  distributedMessages.forEach((message) => {
-    console.log(`Sending ${message.messages} messages to ${message.provider}`);
-  });
+  calculateCumulativeWeights(servers) {
+    let cumulativeWeights = new Array(servers.length);
+    cumulativeWeights[0] = servers[0].weight;
+    for (let i = 1; i < servers.length; i++) {
+      cumulativeWeights[i] = cumulativeWeights[i - 1] + servers[i].weight;
+    }
+    return cumulativeWeights;
+  }
+
+  getNextServer() {
+    let randomValue = this.random.nextInt(this.totalWeight);
+    for (let i = 0; i < this.cumulativeWeights.length; i++) {
+      if (randomValue < this.cumulativeWeights[i]) {
+        this.currentIndex = i;
+        break;
+      }
+    }
+    return this.servers[this.currentIndex];
+  }
 }
 
-// Example usage
-let providers = [
-  { name: "A", throughput: 100, status: "up" },
-  { name: "B", throughput: 100, status: "up" },
-  { name: "C", throughput: 100, status: "up" },
+class Server {
+  constructor(name, weight) {
+    this.name = name;
+    this.weight = weight;
+  }
+}
+
+// Sample list of servers with weights
+let serverList = [
+  new Server("Server1", 3),
+  new Server("Server2", 2),
+  new Server("Server3", 1),
 ];
 
-distributeMessages(providers, 300);
+// Create a weighted round-robin load balancer with the server list
+let balancer = new WeightedRoundRobinBalancer(serverList);
+
+// Simulate requests to the load balancer
+for (let i = 0; i < 10; i++) {
+  let nextServer = balancer.getNextServer();
+  console.log(`Request ${i + 1}: Routed to ${nextServer.name}`);
+}
