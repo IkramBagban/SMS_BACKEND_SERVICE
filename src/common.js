@@ -1,7 +1,11 @@
+import bodyParser from "body-parser";
 import express from "express";
 
 export function createServer(provider) {
   const app = express();
+
+  app.use(bodyParser.json());
+
   app.get("/", (req, res) => {
     res.json({
       server: `[Load Balancer] Server listening on port ${provider.port}`,
@@ -13,11 +17,12 @@ export function createServer(provider) {
   app.post("/send-sms", async (req, res) => {
     try {
       const message = req.body;
-      const { status, result } = await provider.sendMessage(message);
+      const { code, result } = await provider.sendMessage(message);
       res.status(code).json(result);
     } catch (err) {
-      console.log(err);
-      res.status(code).json(err);
+      // TODO: handle error properly
+      console.error(err);
+      res.status(err.code ?? 500).json(err);
     }
   });
 
