@@ -2,9 +2,12 @@
   "name": "servm-assignment",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/index.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start:load-balancer": "nodemon src/index.js",
+    "start:server": "pm2 start ./src/servers/airtel.js && pm2 start ./src/servers/jio.js && pm2 start ./src/servers/vi.js",
+    "stop": "pm2 stop all"
   },
   "keywords": [],
   "author": "",
@@ -13,9 +16,19 @@
     "axios": "^1.6.8",
     "body-parser": "^1.20.2",
     "crypto": "^1.0.1",
+    "csv-writer": "^1.6.0",
+    "csvtojson": "^2.0.10",
     "dotenv": "^16.4.5",
     "express": "^4.19.1",
+    "express-rate-limit": "^7.2.0",
+    "http-proxy-middleware": "^2.0.6",
     "mongoose": "^8.2.3",
-    "twilio": "^5.0.1"
+    "pm2": "^5.3.1",
+    "twilio": "^5.0.1",
+    "weighted-round-robin": "^2.0.2"
+  },
+  "devDependencies": {
+    "loadtest": "^8.0.9",
+    "nodemon": "^3.1.0"
   }
 }
