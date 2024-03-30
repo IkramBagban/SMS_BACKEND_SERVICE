@@ -2,10 +2,9 @@ import express from "express";
 import { airtelProvider } from "./servers/airtel.js";
 import { jioProvider } from "./servers/jio.js";
 import { viProvider } from "./servers/vi.js";
-import { proxyRequest, selectedServerProxy } from "./middleware/proxy.js";
-import { WeightedRoundRobinBalancer } from "./utils/load-balancer.js";
 import { logger } from "./middleware/logger.js";
 import Peers from "weighted-round-robin";
+import { createProxyMiddleware } from "http-proxy-middleware";
 
 const servers = [airtelProvider, jioProvider, viProvider];
 const throughputs = servers.map((server) => server.throughput);
@@ -20,7 +19,6 @@ const serverConfigurations = servers.map((server) => ({
 
 const app = express();
 const port = 8000;
-const balancer = new WeightedRoundRobinBalancer(serverConfigurations);
 const peers = new Peers();
 
 serverConfigurations.forEach(({ port, weight }) =>
@@ -39,15 +37,16 @@ app.use((req, res, next) => {
   // Log the request information to CSV
   logger(req, selectedServer);
 
-  if (selectedServer) {
-    proxyRequest(req, res);
-  } else {
-    res.status(503).send("Service Unavailable");
-  }
+  next();
 });
 
-// Use the proxy middleware for all routes
-app.use("/", selectedServerProxy);
+// Proxy middleware configuration
+app.use("/", (req, res, next) => {
+  createProxyMiddleware({
+    target: req.selectedServer.server,
+    changeOrigin: true,
+  })(req, res, next);
+});
 
 app.listen(port, () => {
   console.log(`Load Balancer listening at <http://localhost>:${port}`);
