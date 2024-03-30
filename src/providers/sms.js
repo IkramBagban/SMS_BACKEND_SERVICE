@@ -6,7 +6,7 @@ export class SMSProvider {
     this.status = "idle";
     this.count = 0;
     this.queue = [];
-    this.messageTimestamps = [];
+    this.requestTimestamps = [];
     // this.tokenBucket = new TokenBucket(this.throughput, this.throughput / 60);
   }
 
