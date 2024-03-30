@@ -6,8 +6,7 @@ const csvWriter = createObjectCsvWriter({
   header: [
     { id: "timestamp", title: "Timestamp" },
     { id: "ip", title: "IP Address" },
-    // { id: "serverPort", title: "Server Port" },
-    { id: "server", title: "Server" },
+    { id: "serverPort", title: "Server Port" },
     { id: "originalUrl", title: "Original URL" },
   ],
 });
@@ -18,7 +17,6 @@ export const logger = (req, selectedServer) => {
     timestamp: new Date().toISOString(),
     ip: req.ip,
     serverPort: selectedServer ? selectedServer.port : "N/A",
-    server: selectedServer ? selectedServer.server : "N/A",
     originalUrl: req.originalUrl,
   };
   csvWriter.writeRecords([logData]);
