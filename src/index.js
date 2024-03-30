@@ -6,7 +6,10 @@ import { logger } from "./middleware/logger.js";
 import Peers from "weighted-round-robin";
 import { createProxyMiddleware } from "http-proxy-middleware";
 
-const servers = [airtelProvider, jioProvider, viProvider];
+const servers = [
+  airtelProvider,
+  // jioProvider, viProvider
+];
 const throughputs = servers.map((server) => server.throughput);
 
 const calculateWeight = (throughput) =>
