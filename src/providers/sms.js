@@ -51,7 +51,7 @@ export class SMSProvider {
         // console.log("Message sending failed:", message);
         reject({
           code: 500,
-          result: { message: `Failed to send message ${message.id}` },
+          message: `Failed to send message ${message.id}`,
         }); // Reject with error message
       }
     });
