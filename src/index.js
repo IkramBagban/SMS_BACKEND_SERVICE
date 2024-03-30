@@ -24,8 +24,6 @@ const app = express();
 const port = 8000;
 const balancer = new WeightedRoundRobinBalancer(serverConfigurations);
 
-app.use(bodyParser.json());
-
 // Middleware to randomly select a server using Weighted Round Robin algorithm
 app.use((req, res, next) => {
   const selectedServer = balancer.selectServer(serverConfigurations);
@@ -34,25 +32,19 @@ app.use((req, res, next) => {
   // Log the request information to CSV
   logger(req, selectedServer);
 
-  // if (selectedServer) {
-  //   proxyRequest(req, res);
-  // } else {
-  //   res.status(503).send("Service Unavailable");
-  // }
-
   next();
 });
 
 // Use the proxy middleware for all routes
-app.use("/", selectedServerProxy);
+// app.use("/", selectedServerProxy);
 
 // Proxy middleware configuration
-// app.use("/", (req, res) => {
-//   createProxyMiddleware({
-//     target: `http://localhost:${req.selectedServer.port}`,
-//     changeOrigin: true,
-//   })(req, res);
-// });
+app.use("/", (req, res, next) => {
+  createProxyMiddleware({
+    target: req.selectedServer.server,
+    changeOrigin: true,
+  })(req, res, next);
+});
 
 app.listen(port, () => {
   console.log(`Load Balancer listening at <http://localhost>:${port}`);
