@@ -4,6 +4,7 @@ import rateLimit from "express-rate-limit";
 
 export function createServer(provider) {
   const app = express();
+  let queueLock = false; // Create a lock variable
 
   app.use((req, res, next) => {
     req.selectedServer = JSON.parse(req.header("X-Selected-Server"));
@@ -69,9 +70,16 @@ export function createServer(provider) {
     );
     console.log("Timestamps: " + provider.requestTimestamps);
     // If rate limit allows, process the queued request
+    console.log("Queue length:", provider.queue.length);
     if (provider.requestTimestamps.length < provider.throughput) {
-      if (provider.queue.length > 0) {
+      // Acquire the lock to ensure atomicity
+      if (!queueLock && provider.queue.length > 0) {
+        queueLock = true; // Set the lock
         const { req: queuedReq, res: queuedRes } = provider.queue.shift(); // Dequeue the request
+
+        // Release the lock
+        queueLock = false;
+
         // Handle the request
         console.log("Processing queued request");
         // axios.request(queuedReq, queuedRes).then(function (response) {
