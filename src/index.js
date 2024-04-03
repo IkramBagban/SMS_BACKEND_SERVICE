@@ -31,9 +31,8 @@ serverConfigurations.forEach(({ port, weight }) =>
   })
 );
 
-// Middleware to randomly select a server using Weighted Round Robin algorithm
+// Middleware to select a server using Weighted Round Robin algorithm
 app.use((req, res, next) => {
-  // const selectedServer = balancer.selectServer(serverConfigurations);
   const selectedServer = peers.get();
   req.selectedServer = selectedServer;
 
@@ -48,6 +47,13 @@ app.use("/", (req, res, next) => {
   createProxyMiddleware({
     target: req.selectedServer.server,
     changeOrigin: true,
+    onProxyReq: (proxyReq, req, res) => {
+      // Propagate selected server to proxied request
+      proxyReq.setHeader(
+        "X-Selected-Server",
+        JSON.stringify(req.selectedServer)
+      );
+    },
   })(req, res, next);
 });
 
