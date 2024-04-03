@@ -1,8 +1,14 @@
+import axios from "axios";
 import express from "express";
 import rateLimit from "express-rate-limit";
 
 export function createServer(provider) {
   const app = express();
+
+  app.use((req, res, next) => {
+    res.setHeader("X-Server-ID", provider.name);
+    next();
+  });
 
   const limiter = rateLimit({
     windowMs: 10 * 1000, // 1 minute
@@ -13,7 +19,8 @@ export function createServer(provider) {
     message: `You have exceeded your ${provider.throughput} requests per minute limit.}`,
     handler: (req, res, next, options) => {
       console.log("Queueing request");
-      provider.queue.push({ req, res });
+      provider.queue.push({ req, res, timestamp: Date.now() });
+      console.log(`${provider.name} Queue: `, provider.queue);
       next();
     },
   });
@@ -21,19 +28,50 @@ export function createServer(provider) {
   app.use(limiter);
   app.use(express.json());
 
-  // Middleware to store request timestamps
-  app.use((req, res, next) => {
-    // Store the timestamp of the current request
+  // Function to retry queued requests when rate limit window resets
+  function retryQueuedRequests() {
     const currentTime = Date.now();
-    provider.requestTimestamps.push(currentTime);
+    for (let i = requestQueue.length - 1; i >= 0; i--) {
+      const queuedRequest = provider.queue[i];
+      if (queuedRequest.timestamp + limiter.windowMs <= currentTime) {
+        // Retry the request
+        makeRequest(queuedRequest.req, queuedRequest.res);
+        // Remove the request from the queue
+        requestQueue.splice(i, 1);
+      }
+    }
+  }
 
-    // Remove timestamps older than the window period
-    provider.requestTimestamps = provider.requestTimestamps.filter(
-      (timestamp) => currentTime - timestamp < 60 * 1000
-    );
+  // Function to make the actual request
+  async function makeRequest(req, res) {
+    try {
+      const response = await axios(req.originalUrl, {
+        method: req.method,
+        headers: req.headers,
+        data: req.body,
+      });
+      res.status(response.status).send(response.data);
+    } catch (error) {
+      res.status(500).send("Error occurred during request.");
+    }
+  }
 
-    next(); // Continue processing the request
-  });
+  // Start a timer to periodically check for rate limit window reset
+  setInterval(retryQueuedRequests, 1000); // Check every second
+
+  // Middleware to store request timestamps
+  // app.use((req, res, next) => {
+  //   // Store the timestamp of the current request
+  //   const currentTime = Date.now();
+  //   provider.requestTimestamps.push(currentTime);
+
+  //   // Remove timestamps older than the window period
+  //   provider.requestTimestamps = provider.requestTimestamps.filter(
+  //     (timestamp) => currentTime - timestamp < 60 * 1000
+  //   );
+
+  //   next(); // Continue processing the request
+  // });
 
   app.get("/", (req, res) => {
     res.json({
@@ -55,22 +93,7 @@ export function createServer(provider) {
   });
 
   // Process queued requests if rate limit allows
-  app.use((req, res, next) => {
-    const currentTime = Date.now();
-    // Remove expired timestamps from the array
-    provider.requestTimestamps = provider.requestTimestamps.filter(
-      (timestamp) => currentTime - timestamp < 60 * 1000
-    );
-    // If rate limit allows, process the queued request
-    if (provider.requestTimestamps.length < provider.throughput) {
-      const { req: queuedReq, res: queuedRes } = provider.queue.shift(); // Dequeue the request
-      // Handle the request
-      console.log("Processing queued request");
-      queuedRes.send("Queued request processed successfully.");
-      // Record the timestamp of the processed request
-      provider.requestTimestamps.push(currentTime);
-    }
-  });
+  // app.use
 
   app.listen(provider.port, () => {
     console.log(`Server listening on port ${provider.port}`);
