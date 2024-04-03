@@ -1,9 +1,11 @@
 import axios from "axios";
 import express from "express";
 import rateLimit from "express-rate-limit";
+import { stringify } from "flatted";
 
 export function createServer(provider) {
   const app = express();
+  let processingQueuedRequests = false;
 
   app.use((req, res, next) => {
     req.selectedServer = JSON.parse(req.header("X-Selected-Server"));
@@ -20,8 +22,12 @@ export function createServer(provider) {
     handler: (req, res, next, options) => {
       console.log("Queueing request");
       // provider.queue.push({ req, res, timestamp: Date.now() });
-      provider.queue.add({ req, res, timestamp: Date.now() });
-      console.log(`${provider.name} Queue: `, provider.queue.length);
+      provider.queue.add({
+        stringifiedReq: stringify(req),
+        stringifiedRes: stringify(res),
+        timestamp: Date.now(),
+      });
+      console.log(`${provider.name} Queue: `, provider.queue);
       next();
     },
   });
@@ -43,25 +49,6 @@ export function createServer(provider) {
     next(); // Continue processing the request
   });
 
-  // Function to make the actual request
-  // async function makeRequest(req, res) {
-  //   try {
-  //     const response = await axios(
-  //       `${req.selectedServer.server}${req.originalUrl}`,
-  //       {
-  //         method: req.method,
-  //         headers: req.headers,
-  //         data: req.body,
-  //       }
-  //     );
-  //     console.log("retry response", response);
-  //     res.status(response.status).send(response.data);
-  //   } catch (error) {
-  //     console.log("retry error", error);
-  //     res.status(500).send("Error occurred during request.");
-  //   }
-  // }
-
   async function retryQueuedRequests() {
     const currentTime = Date.now();
     // Remove expired timestamps from the array
@@ -70,41 +57,46 @@ export function createServer(provider) {
     );
     console.log("Timestamps: " + provider.requestTimestamps);
 
-    // If rate limit allows, process the queued request
-    // Improved version of the code snippet
-    async function processQueue(provider) {
-      if (provider.requestTimestamps.length < provider.throughput) {
-        if (provider.queue.length > 0) {
-          const job = await queue.getJob(provider.queue.shift()); // Dequeue the request using a queue library
-          // Handle the request
+    console.log("Checking queue size");
+    let queueLength = await provider.queue._eventsCount;
+
+    if (provider.requestTimestamps.length < provider.throughput) {
+      if (queueLength > 0 && !processingQueuedRequests) {
+        processingQueuedRequests = true;
+        provider.queue.process(async (job, done) => {
           console.log("Processing queued request");
+          const queuedReq = parse(job.data.stringifiedReq);
+          const queuedRes = parse(job.data.stringifiedRes);
           try {
             const response = await axios(
-              `${job.data.req.selectedServer.server}${job.data.req.originalUrl}`,
+              `${queuedReq.selectedServer.server}${queuedReq.originalUrl}`,
               {
-                method: job.data.req.method,
-                headers: job.data.req.headers,
-                data: job.data.req.body,
+                method: queuedReq.method,
+                headers: queuedReq.headers,
+                data: queuedReq.body,
               }
             );
             console.log("retry response", response);
-            job.data.res.status(response.status).send(response.data);
+            queuedRes.status(response.status).send(response.data);
           } catch (error) {
             console.log("retry error", error);
-            job.data.res.status(500).send("Error occurred during request.");
+            queuedRes.status(500).send("Error occurred during request.");
           }
-          // Record the timestamp of the processed request
-          provider.requestTimestamps.push(currentTime);
-        } else {
-          console.log("Queue empty");
-        }
-      } else {
-        console.log("Rate limit reached");
-      }
-    }
 
-    // Call the function or method with the provider object
-    processQueue(provider);
+          await job.remove();
+          done();
+        });
+
+        processingQueuedRequests = false;
+
+        // // Record the timestamp of the processed request
+        // provider.requestTimestamps.push(currentTime);
+      } else {
+        console.log("Queue empty");
+      }
+    } else {
+      console.log("Rate limit reached");
+    }
   }
 
   // Start a timer to periodically check for rate limit window reset
