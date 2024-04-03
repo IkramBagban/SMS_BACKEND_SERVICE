@@ -48,6 +48,13 @@ app.use("/", (req, res, next) => {
   createProxyMiddleware({
     target: req.selectedServer.server,
     changeOrigin: true,
+    onProxyReq: (proxyReq, req, res) => {
+      // Propagate selected server to proxied request
+      proxyReq.setHeader(
+        "X-Selected-Server",
+        JSON.stringify(req.selectedServer)
+      );
+    },
   })(req, res, next);
 });
 
